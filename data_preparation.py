@@ -3,6 +3,7 @@ import shutil
 import zipfile
 from pathlib import Path
 
+import cv2
 import numpy as np
 from PIL import Image
 from huggingface_hub import hf_hub_download
@@ -84,8 +85,7 @@ class DataPreparer:
 
     @staticmethod
     def _fix_depth_file(img_path: str, n_parts: int = 10):
-        img = Image.open(img_path)
-        img = np.array(img)
+        img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
 
         rows_value = np.mean(img, axis=1)
         rows_value_split = np.array_split(rows_value, n_parts)
@@ -94,5 +94,4 @@ class DataPreparer:
 
         if to_color_revert:
             reverted_img = np.iinfo(img.dtype).max - img
-            reverted_img = Image.fromarray(reverted_img)
-            reverted_img.save(img_path)
+            cv2.imwrite(img_path, reverted_img)
