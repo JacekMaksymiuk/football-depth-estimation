@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import Compose
 from tqdm import tqdm
 
-from depth_anything.dataset_loader import DepthDataset
+from da_fine_tuning.dataset_loader import DepthDataset
 from depth_anything.dpt import DepthAnything
 from depth_anything.transform import Resize, NormalizeImage, PrepareForNet
 
