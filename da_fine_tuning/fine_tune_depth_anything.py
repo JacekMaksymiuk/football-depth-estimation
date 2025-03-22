@@ -19,11 +19,13 @@ from depth_anything.transform import Resize, NormalizeImage, PrepareForNet
 
 class RSELoss(torch.nn.Module):
 
+    _EPS = 1e-6
+
     def __init__(self):
         super(RSELoss, self).__init__()
 
-    def forward(self, pred, target):
-        return torch.mean(((target - pred) ** 2) / target)
+    def forward(self, pred, target, mask):
+        return torch.mean((((target - pred) ** 2) / (target + self._EPS))[mask])
 
 
 class DepthAnythingFineTuner:
@@ -35,18 +37,18 @@ class DepthAnythingFineTuner:
         self._image_train_path = depth_train_path.parent / depth_train_path.name.replace('depths', 'images')
         self._image_val_path = depth_val_path.parent / depth_val_path.name.replace('depths', 'images')
         self._image_test_path = depth_test_path.parent / depth_test_path.name.replace('depths', 'images')
+        self._mask_train_path = depth_train_path.parent / depth_train_path.name.replace('depths', 'masks')
+        self._mask_val_path = depth_val_path.parent / depth_val_path.name.replace('depths', 'masks')
+        self._mask_test_path = depth_test_path.parent / depth_test_path.name.replace('depths', 'masks')
 
         self._depth_anything = DepthAnything.from_pretrained('LiheYoung/depth_anything_vitl14')
         self._depth_anything.to('cuda').eval()
         self._transform = self._prepare_transform()
 
     def fine_tune(self, n_epochs: int = 18, batch_size: int = 4):
-        self._adjust_depths_to_pred()
-
-        train_ds = DepthDataset(self._image_train_path, self._depth_train_path, transform=self._transform)
-        val_ds = DepthDataset(self._image_val_path, self._depth_val_path, transform=self._transform)
+        train_ds = DepthDataset(
+            self._image_train_path, self._depth_train_path, self._mask_train_path, transform=self._transform)
         train_loader = DataLoader(train_ds, batch_size=1, shuffle=True)
-        val_loader = DataLoader(val_ds, batch_size=1, shuffle=False)
 
         loss_fn = RSELoss()
         optimizer = optim.AdamW(self._depth_anything.parameters(), lr=5e-6, weight_decay=0.01)
@@ -58,10 +60,10 @@ class DepthAnythingFineTuner:
             self._depth_anything.train()
             total_loss, cnt = 0.0, 0
             train_progress_bar = tqdm(train_loader, desc=f'Epoch {epoch + 1}/{n_epochs}', leave=True)
-            for images, depths in train_progress_bar:
-                images, depths = images.to('cuda'), depths.to('cuda')
+            for images, depths, masks in train_progress_bar:
+                images, depths, masks = images.to('cuda'), depths.to('cuda'), masks.to('cuda')
                 predictions = self._depth_anything(images)
-                loss = loss_fn(predictions, depths)
+                loss = loss_fn(predictions, depths, masks)
                 loss = loss / batch_size  # New
                 cnt += 1
                 loss.backward()
@@ -92,7 +94,9 @@ class DepthAnythingFineTuner:
                 depth = (depth - depth.min()) / (depth.max() - depth.min()) * 255.0 ** 2
                 depth = depth.cpu().numpy().astype(np.uint16)
 
-                scale, shift = self._compute_scale_and_shift_np(depth, np_orig)
+                mask = np.load(str(self._mask_val_path / filename.replace('.png', '.npy')))
+
+                scale, shift = self._compute_scale_and_shift_np(depth, np_orig, mask)
                 depth = scale * depth + shift
 
                 total_err_sq += np.mean(((np_orig - depth) ** 2) / np_orig)
@@ -118,12 +122,12 @@ class DepthAnythingFineTuner:
         ])
 
     @staticmethod
-    def _compute_scale_and_shift_np(prediction, target):
-        a_00 = np.sum(prediction * prediction, (0, 1))
-        a_01 = np.sum(prediction, (0, 1))
-        a_11 = np.sum(np.ones(prediction.shape), (0, 1))
-        b_0 = np.sum(prediction * target, (0, 1))
-        b_1 = np.sum(target, (0, 1))
+    def _compute_scale_and_shift_np(prediction, target, mask):
+        a_00 = np.sum(mask * prediction * prediction, axis=(0, 1))
+        a_01 = np.sum(mask * prediction, axis=(0, 1))
+        a_11 = np.sum(mask, axis=(0, 1))
+        b_0 = np.sum(mask * prediction * target, axis=(0, 1))
+        b_1 = np.sum(mask * target, axis=(0, 1))
         x_0 = np.zeros_like(b_0)
         x_1 = np.zeros_like(b_1)
         det = a_00 * a_11 - a_01 * a_01
@@ -132,7 +136,7 @@ class DepthAnythingFineTuner:
         x_1[valid] = (-a_01[valid] * b_0[valid] + a_00[valid] * b_1[valid]) / det[valid]
         return x_0, x_1
 
-    def _adjust_depths_to_pred(self, thresh=255.):
+    def adjust_depths_to_pred(self, thresh=255.):
         filenames = sorted(os.listdir(self._depth_train_path))
         random.shuffle(filenames)
         ch_progress_bar = tqdm(filenames, desc=f"Adjust to pred", leave=True)
@@ -149,7 +153,9 @@ class DepthAnythingFineTuner:
             pred_depth = F.interpolate(pred_depth[None], (h, w), mode='bilinear', align_corners=False)[0, 0]
             pred_depth = pred_depth.cpu().numpy() * 255.
 
-            scale, shift = self._compute_scale_and_shift_np(np_orig_depth, pred_depth)
+            mask = np.load(str(self._mask_train_path / img_filename.replace('.png', '.npy')))
+
+            scale, shift = self._compute_scale_and_shift_np(np_orig_depth, pred_depth, mask)
             new_np_orig_depth = scale * np_orig_depth + shift
 
             new_np_orig_depth[new_np_orig_depth < thresh] = thresh
