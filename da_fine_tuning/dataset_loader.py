@@ -33,14 +33,16 @@ class DepthDataset(Dataset):
 
     @staticmethod
     def load_depth(file_path: str):
-        depth = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
+        depth = cv2.imread(file_path, cv2.IMREAD_UNCHANGED)
         depth = cv2.resize(depth, (924, 518), interpolation=cv2.INTER_AREA)
-        depth = depth / 1.0
+        depth = depth / 255.
         depth = torch.from_numpy(depth).unsqueeze(0)
         return depth
 
     @staticmethod
     def load_mask(file_path: str):
-        mask = np.load(file_path)
-        mask = torch.from_numpy(mask).unsqueeze(0)
+        mask = ~np.load(file_path)
+        mask = torch.from_numpy(mask).unsqueeze(0).float()
+        mask = torch.nn.functional.interpolate(mask.unsqueeze(0), size=(518, 924), mode='nearest').squeeze(0)
+        mask = mask.bool()
         return mask

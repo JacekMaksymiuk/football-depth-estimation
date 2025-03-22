@@ -33,7 +33,7 @@ class DataPreparer:
     def __init__(self, workdir: Path):
         self._workdir = workdir
 
-    def prepare(self, datasets: list[str] = None):
+    def prepare(self, datasets: list[int] = None):
         for dataset in datasets or self.ALL:
             _, depths_path = self._download_and_extract_dataset(dataset)
             self._fix_depth_for_dataset(depths_path)

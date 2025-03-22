@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from tqdm import tqdm
 
 import cv2
 import numpy as np
@@ -10,7 +11,7 @@ class DatasetPreparer:
 
     def prepare_dataset(self, path_to_images: Path, mask_output_path: Path):
         mask_output_path.mkdir()
-        for image_filename in os.listdir(path_to_images):
+        for image_filename in tqdm(os.listdir(path_to_images), desc=f'Prepare masks', leave=True):
             img = cv2.imread(str(path_to_images / image_filename))
             mask = self._get_mask(img)
             np.save(mask_output_path / f'{image_filename.replace(".png", ".npy")}', mask)

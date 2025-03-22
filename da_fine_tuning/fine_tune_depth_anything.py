@@ -45,7 +45,7 @@ class DepthAnythingFineTuner:
         self._depth_anything.to('cuda').eval()
         self._transform = self._prepare_transform()
 
-    def fine_tune(self, n_epochs: int = 18, batch_size: int = 4):
+    def fine_tune(self, n_epochs: int = 18, batch_size: int = 4, checkpoint_path: Path = None):
         train_ds = DepthDataset(
             self._image_train_path, self._depth_train_path, self._mask_train_path, transform=self._transform)
         train_loader = DataLoader(train_ds, batch_size=1, shuffle=True)
@@ -77,6 +77,8 @@ class DepthAnythingFineTuner:
 
             scheduler.step()
             print(f'Epoch {epoch + 1}/{n_epochs}, Loss: {total_loss / len(train_loader):.4f}')
+            if checkpoint_path is not None:
+                self._save(checkpoint_path / f'da_ft_epoch{epoch + 1}.pth')
 
             ### Val
             self._depth_anything.eval()
@@ -94,7 +96,8 @@ class DepthAnythingFineTuner:
                 depth = (depth - depth.min()) / (depth.max() - depth.min()) * 255.0 ** 2
                 depth = depth.cpu().numpy().astype(np.uint16)
 
-                mask = np.load(str(self._mask_val_path / filename.replace('.png', '.npy')))
+                mask = ~np.load(str(self._mask_val_path / filename.replace('.png', '.npy')))
+                mask = mask.astype(np.float32)
 
                 scale, shift = self._compute_scale_and_shift_np(depth, np_orig, mask)
                 depth = scale * depth + shift
@@ -151,12 +154,15 @@ class DepthAnythingFineTuner:
                 pred_depth = self._depth_anything(img_to_pred)
 
             pred_depth = F.interpolate(pred_depth[None], (h, w), mode='bilinear', align_corners=False)[0, 0]
-            pred_depth = pred_depth.cpu().numpy() * 255.
+            pred_depth = pred_depth.cpu().numpy()
 
-            mask = np.load(str(self._mask_train_path / img_filename.replace('.png', '.npy')))
+            mask = ~np.load(str(self._mask_train_path / img_filename.replace('.png', '.npy')))
+            mask = mask.astype(np.float32)
 
             scale, shift = self._compute_scale_and_shift_np(np_orig_depth, pred_depth, mask)
             new_np_orig_depth = scale * np_orig_depth + shift
+
+            new_np_orig_depth = new_np_orig_depth * 255.
 
             new_np_orig_depth[new_np_orig_depth < thresh] = thresh
             new_np_orig_depth[new_np_orig_depth > 255 ** 2 - thresh] = 255 ** 2 - thresh
@@ -171,3 +177,6 @@ class DepthAnythingFineTuner:
         log_diff = np.log(pred) - np.log(target)
         silog_err = np.sqrt(np.mean(log_diff ** 2) - (np.mean(log_diff) ** 2))
         return silog_err * 100
+
+    def _save(self, path: Path):
+        torch.save(self._depth_anything.state_dict(), str(path))
