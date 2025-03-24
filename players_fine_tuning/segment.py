@@ -1,6 +1,7 @@
 import os
 import cv2
 from pathlib import Path
+from tqdm import tqdm
 
 import numpy as np
 from ultralytics import YOLO
@@ -14,7 +15,7 @@ class PlayerSegmenter:
         self._model = YOLO("yolov8x-seg.pt").to('cuda')
 
     def segment(self, images_path: Path, output_path: Path):
-        for image_filename in os.listdir(images_path):
+        for image_filename in tqdm(os.listdir(images_path), desc=f'Process segmentation', leave=True):
             img_path = images_path / image_filename
             self._pred(img_path, output_path)
 

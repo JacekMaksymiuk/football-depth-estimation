@@ -15,6 +15,7 @@ from tqdm import tqdm
 from da_fine_tuning.dataset_loader import DepthDataset
 from depth_anything.dpt import DepthAnything
 from depth_anything.transform import Resize, NormalizeImage, PrepareForNet
+from utils.misc import compute_scale_and_shift_np
 
 
 class RSELoss(torch.nn.Module):
@@ -99,7 +100,7 @@ class DepthAnythingFineTuner:
                 mask = ~np.load(str(self._mask_val_path / filename.replace('.png', '.npy')))
                 mask = mask.astype(np.float32)
 
-                scale, shift = self._compute_scale_and_shift_np(depth, np_orig, mask)
+                scale, shift = compute_scale_and_shift_np(depth, np_orig, mask)
                 depth = scale * depth + shift
 
                 total_err_sq += np.mean(((np_orig - depth) ** 2) / np_orig)
@@ -124,21 +125,6 @@ class DepthAnythingFineTuner:
             PrepareForNet(),
         ])
 
-    @staticmethod
-    def _compute_scale_and_shift_np(prediction, target, mask):
-        a_00 = np.sum(mask * prediction * prediction, axis=(0, 1))
-        a_01 = np.sum(mask * prediction, axis=(0, 1))
-        a_11 = np.sum(mask, axis=(0, 1))
-        b_0 = np.sum(mask * prediction * target, axis=(0, 1))
-        b_1 = np.sum(mask * target, axis=(0, 1))
-        x_0 = np.zeros_like(b_0)
-        x_1 = np.zeros_like(b_1)
-        det = a_00 * a_11 - a_01 * a_01
-        valid = det > 0
-        x_0[valid] = (a_11[valid] * b_0[valid] - a_01[valid] * b_1[valid]) / det[valid]
-        x_1[valid] = (-a_01[valid] * b_0[valid] + a_00[valid] * b_1[valid]) / det[valid]
-        return x_0, x_1
-
     def adjust_depths_to_pred(self, thresh=255.):
         filenames = sorted(os.listdir(self._depth_train_path))
         random.shuffle(filenames)
@@ -159,7 +145,7 @@ class DepthAnythingFineTuner:
             mask = ~np.load(str(self._mask_train_path / img_filename.replace('.png', '.npy')))
             mask = mask.astype(np.float32)
 
-            scale, shift = self._compute_scale_and_shift_np(np_orig_depth, pred_depth, mask)
+            scale, shift = compute_scale_and_shift_np(np_orig_depth, pred_depth, mask)
             new_np_orig_depth = scale * np_orig_depth + shift
 
             new_np_orig_depth = new_np_orig_depth * 255.
