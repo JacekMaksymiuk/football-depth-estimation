@@ -51,9 +51,7 @@ class PlayerFineTuner:
         )
         return train_ds, val_ds
 
-
-    def fine_tune(
-            self, n_epochs: int = 18, batch_size: int = 32, use_scheduler: bool = False):
+    def fine_tune(self, n_epochs: int = 100, batch_size: int = 32, use_scheduler: bool = False):
         train_ds, val_ds = self._get_datasets()
         train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
         val_loader = DataLoader(val_ds, batch_size=128, shuffle=False)
@@ -69,7 +67,7 @@ class PlayerFineTuner:
             progress_bar = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{n_epochs}", leave=True)
 
             cnt = 0
-            for inputs, targets, masks, _ in progress_bar:
+            for inputs, targets, masks in progress_bar:
                 inputs, targets, masks = inputs.to(self._device), targets.to(self._device), masks.to(self._device)
                 optimizer.zero_grad()
                 predictions = self._model(inputs)
@@ -88,7 +86,7 @@ class PlayerFineTuner:
             self._model.eval()
             val_progress_bar = tqdm(val_loader, desc=f"Val error", leave=True)
             val_loss, val_cnt, ratio_ok_loss, ratio_nok_loss, ratio = 0, 0, 0, 0, 0
-            for inputs, targets, masks, _ in val_progress_bar:
+            for inputs, targets, masks in val_progress_bar:
                 inputs, targets, masks = inputs.to(self._device), targets.to(self._device), masks.to(self._device)
                 with torch.no_grad():
                     predictions = self._model(inputs)
@@ -105,3 +103,14 @@ class PlayerFineTuner:
 
     def save(self, path_to_save: Path):
         torch.save(self._best_model.state_dict(), path_to_save)
+
+    def predict_tmp(self, player_depth_path: Path):
+        import numpy as np
+        player_depth = PlayerDataset.load_image(player_depth_path, PlayerDataset.SIZE)
+        player_depth = player_depth.unsqueeze(0).to(self._device)
+        self._model.eval()
+        with torch.no_grad():
+            pred = self._model(player_depth)
+        pred = pred.squeeze(0).cpu().numpy()
+        pred = pred * 255 + 127
+        return pred.astype(np.uint8)

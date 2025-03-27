@@ -166,3 +166,19 @@ class DepthAnythingFineTuner:
 
     def _save(self, path: Path):
         torch.save(self._depth_anything.state_dict(), str(path))
+
+    def load_from_file(self, model_path: Path):
+        self._depth_anything.load_state_dict(torch.load(str(model_path)))
+
+    def predict(self, img_path: Path):
+        np_img = cv2.imread(str(img_path))
+        h, w = np_img.shape[:2]
+        img = DepthDataset.load_image(str(img_path), self._transform).unsqueeze(0).to('cuda')
+
+        with torch.no_grad():
+            depth = self._depth_anything(img)
+
+        depth = F.interpolate(depth[None], (h, w), mode='bilinear', align_corners=False)[0, 0]
+        depth = (depth - depth.min()) / (depth.max() - depth.min()) * 255.0 ** 2
+
+        return depth.cpu().numpy().astype(np.uint16)

@@ -46,17 +46,17 @@ class DatasetPreparer:
         self._val_mask_path = val_segments_path / self.MASKS_FOLDER_NAME
         self._test_mask_path = test_segments_path / self.MASKS_FOLDER_NAME
 
-        train_filenames = os.listdir(self._train_mask_path)
+        train_filenames = os.listdir(train_segments_path)
         self._train_mask_path.mkdir()
         for filename in train_filenames:
             os.rename(train_segments_path / filename, self._train_mask_path / filename)
 
-        val_filenames = os.listdir(self._val_mask_path)
+        val_filenames = os.listdir(val_segments_path)
         self._val_mask_path.mkdir()
         for filename in val_filenames:
             os.rename(val_segments_path / filename, self._val_mask_path / filename)
 
-        test_filenames = os.listdir(self._test_mask_path)
+        test_filenames = os.listdir(test_segments_path)
         self._test_mask_path.mkdir()
         for filename in test_filenames:
             os.rename(test_segments_path / filename, self._test_mask_path / filename)
@@ -69,6 +69,7 @@ class DatasetPreparer:
         self._train_diff_path = train_segments_path / self.DIFFS_FOLDER_NAME
         self._val_diff_path = val_segments_path / self.DIFFS_FOLDER_NAME
         self._test_diff_path = test_segments_path / self.DIFFS_FOLDER_NAME
+        self._train_diff_path.mkdir(), self._val_diff_path.mkdir(), self._test_diff_path.mkdir()
 
     def prepare_dataset(self):
         self._prepare(self._train_segments_path, self._train_orig_depth_path, self._train_pred_path)
