@@ -25,7 +25,6 @@ class MaskedMSE(nn.Module):
             mask = mask.unsqueeze(0)
         return ((pred - target) ** 2)[mask].mean()
 
-
 class PlayerFineTuner:
 
     def __init__(self, train_path: Path, val_path: Path, device: str = 'cuda'):
@@ -51,14 +50,14 @@ class PlayerFineTuner:
         )
         return train_ds, val_ds
 
-    def fine_tune(self, n_epochs: int = 100, batch_size: int = 32, use_scheduler: bool = False):
+    def fine_tune(self, n_epochs: int = 15, batch_size: int = 32, use_scheduler: bool = False):
         train_ds, val_ds = self._get_datasets()
         train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
         val_loader = DataLoader(val_ds, batch_size=128, shuffle=False)
 
         loss_fn = MaskedMSE()
         optimizer = optim.AdamW(self._model.parameters(), lr=1e-3)
-        scheduler = LambdaLR(optimizer, lr_lambda=lambda e: 1.0 - (e / (n_epochs - 1)) * 0.9)
+        scheduler = LambdaLR(optimizer, lr_lambda=lambda e: 1.0 - (e / (n_epochs - 1)) * 0.9) if use_scheduler else None
 
         for epoch in range(n_epochs):
             self._model.train()

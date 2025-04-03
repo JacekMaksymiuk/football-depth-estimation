@@ -10,7 +10,7 @@ from utils.misc import compute_scale_and_shift_np
 
 class DatasetPreparer:
 
-    DIFF_SCALAR = 100.
+    DIFF_SCALAR = 1.
 
     MASKS_FOLDER_NAME = 'masks'
     DEPTHS_FOLDER_NAME = 'depths'
@@ -88,6 +88,9 @@ class DatasetPreparer:
 
             depth = cv2.imread(str(orig_depth_path / f'{group_name}.png'), cv2.IMREAD_UNCHANGED) / 255 ** 2
             pred = cv2.imread(str(pred_path / f'{group_name}.png'), cv2.IMREAD_UNCHANGED) / 255 ** 2
+            pred = pred - pred.min()
+            pred = pred / pred.max()
+
             scale, shift = compute_scale_and_shift_np(depth, pred, np.ones_like(depth))
             scaled_depth = scale * depth + shift
             diff = scaled_depth - pred

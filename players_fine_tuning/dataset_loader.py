@@ -44,7 +44,6 @@ class PlayerDataset(Dataset):
         diff = np.load(file_path)
         diff = torch.from_numpy(diff).float()
         diff = F.interpolate(diff.unsqueeze(0).unsqueeze(0), size, mode='bilinear', align_corners=False)
-        diff = diff / 10.
         return diff.squeeze(0).squeeze(0)
 
     @staticmethod
