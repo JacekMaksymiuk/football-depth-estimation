@@ -27,12 +27,18 @@ class MaskedMSE(nn.Module):
 
 class PlayerFineTuner:
 
-    def __init__(self, train_path: Path, val_path: Path, device: str = 'cuda'):
+    def __init__(self, train_path: Path, val_path: Path, device: str = 'cuda', model_path: Path | None = None):
         self._device = device
         self._model = EnhancedUNet()
         self._model.to(device).eval()
 
         self._best_model, self._best_score = None, 9999999.
+
+        if model_path is not None:
+            self._model.load_state_dict(torch.load(str(model_path)))
+            self._model.to(device).eval()
+            self._best_model = copy.deepcopy(self._model)
+            self._best_model.to(device).eval()
 
         self._train_path = train_path
         self._val_path = val_path
@@ -103,13 +109,5 @@ class PlayerFineTuner:
     def save(self, path_to_save: Path):
         torch.save(self._best_model.state_dict(), path_to_save)
 
-    def predict_tmp(self, player_depth_path: Path):
-        import numpy as np
-        player_depth = PlayerDataset.load_image(player_depth_path, PlayerDataset.SIZE)
-        player_depth = player_depth.unsqueeze(0).to(self._device)
-        self._model.eval()
-        with torch.no_grad():
-            pred = self._model(player_depth)
-        pred = pred.squeeze(0).cpu().numpy()
-        pred = pred * 255 + 127
-        return pred.astype(np.uint8)
+    def predict(self, image: torch.Tensor):
+        return self._best_model(image)

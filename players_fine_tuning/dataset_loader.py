@@ -32,8 +32,12 @@ class PlayerDataset(Dataset):
 
     @staticmethod
     def load_image(file_path, size):
-        depth = np.load(file_path)
-        depth = torch.from_numpy(depth).float()
+        depth_np = np.load(file_path)
+        return PlayerDataset.np_img_to_input_tensor(depth_np, size)
+
+    @staticmethod
+    def np_img_to_input_tensor(np_img: np.ndarray, size):
+        depth = torch.from_numpy(np_img).float()
         depth = F.interpolate(depth.unsqueeze(0).unsqueeze(0), size, mode='bilinear', align_corners=False)
         depth = depth - depth.min()
         depth = depth / depth.max()

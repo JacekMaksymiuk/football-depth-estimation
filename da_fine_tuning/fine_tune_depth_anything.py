@@ -31,7 +31,8 @@ class RSELoss(torch.nn.Module):
 
 class DepthAnythingFineTuner:
 
-    def __init__(self, depth_train_path: Path, depth_val_path: Path, depth_test_path: Path):
+    def __init__(
+            self, depth_train_path: Path, depth_val_path: Path, depth_test_path: Path, checkpoint_path: Path = None):
         self._depth_train_path = depth_train_path
         self._depth_val_path = depth_val_path
         self._depth_test_path = depth_test_path
@@ -44,7 +45,11 @@ class DepthAnythingFineTuner:
 
         self._depth_anything = DepthAnything.from_pretrained('LiheYoung/depth_anything_vitl14')
         self._depth_anything.to('cuda').eval()
-        self._transform = self._prepare_transform()
+        self._transform = self.prepare_transform()
+
+        if checkpoint_path is not None:
+            self._depth_anything.load_state_dict(torch.load(str(checkpoint_path)))
+            self._depth_anything.to('cuda').eval()
 
     def fine_tune(self, n_epochs: int = 18, batch_size: int = 4, checkpoint_path: Path = None):
         train_ds = DepthDataset(
@@ -110,7 +115,7 @@ class DepthAnythingFineTuner:
             print(f"Val loss: silog: {(total_err / total_cnt):.4f}, sq: {(total_err_sq / total_cnt):.4f}")
 
     @staticmethod
-    def _prepare_transform():
+    def prepare_transform():
         return Compose([
             Resize(
                 width=518,
