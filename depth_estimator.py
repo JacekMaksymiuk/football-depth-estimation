@@ -36,12 +36,14 @@ class DepthEstimator:
         self._player_fine_tuner.to(device).eval()
 
     def predict(self, img_path: str, output_path: str):
+        np_img = cv2.imread(img_path)
+        h, w = np_img.shape[:2]
+
         torch_img_to_pred = DepthDataset.load_image(img_path, self._da_transform)
         torch_img_to_pred = torch_img_to_pred.unsqueeze(0).to('cuda')
         with torch.no_grad():
             depth = self._depth_anything(torch_img_to_pred)
 
-        h, w = torch_img_to_pred.shape[2:]
         depth = F.interpolate(depth[None], (h, w), mode='bilinear', align_corners=False)[0, 0]
         depth = (depth - depth.min()) / (depth.max() - depth.min())
         depth = depth.cpu().numpy()
@@ -54,14 +56,14 @@ class DepthEstimator:
             player_depth = PlayerDataset.np_img_to_input_tensor(depth_crop, PlayerDataset.SIZE)
             player_depth = player_depth.unsqueeze(0).unsqueeze(0).to('cuda')
             with torch.no_grad():
-                pred = self._player_fine_tuner.predict(player_depth)
+                pred = self._player_fine_tuner(player_depth)
 
             pred = F.interpolate(pred, (y2 - y1, x2 - x1), mode='bilinear', align_corners=False)[0, 0]
             pred = pred.cpu().numpy()
 
             depth[y1:y2, x1:x2][player_mask.mask] += pred[player_mask.mask] / 2
 
-        depth = depth.clip(depth, 0., 1.)
+        depth = np.clip(depth, 0., 1.)
         depth = np.round(depth * 255 ** 2).astype(np.uint16)
         cv2.imwrite(output_path, depth)
         
