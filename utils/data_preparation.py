@@ -52,8 +52,8 @@ class DataPreparer:
         images_path = self._workdir / f'{prefix}_images'
         depths_path = self._workdir / f'{prefix}_depths'
 
-        os.mkdir(f'/workspace/{prefix}_images')
-        os.mkdir(f'/workspace/{prefix}_depths')
+        os.mkdir(str(images_path))
+        os.mkdir(str(depths_path))
         for game in tqdm(os.listdir(extracted_path), desc=f'Process games', leave=True):
             p = extracted_path / game / 'video_1'
             depths = set(os.listdir(p / 'depth_r'))
