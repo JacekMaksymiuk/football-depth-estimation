@@ -40,7 +40,7 @@ Minimum requirements is 24GB of VRAM, but it is possible to run it on 24GB of VR
     jupyter labextension install @jupyter-widgets/jupyterlab-manager
     ```
    
-2. Run models trainings and fine-tuning, by running the [pipeline.ipynb](pipeline.ipynb) notebook. 
+2. Run models trainings and fine-tuning, by running the [train.ipynb](train.ipynb) notebook. 
 **Important: set output directory to the one you want to save all files to.**
 You'll need 200GB of free disk space (although less than 100GB will be taken up after the training is complete).
 
