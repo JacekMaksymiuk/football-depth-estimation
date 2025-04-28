@@ -17,7 +17,6 @@ from players_fine_tuning.segment import PlayerSegmenter, PlayerMask
 class DepthEstimator:
 
     _HF_REPO = 'JacekMa/football-depth-estimation'
-    _HF_TOKEN = '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'
 
     def __init__(
             self, player_ft_model_path: str | None = None, depth_anything_model_path: str | None = None,
@@ -68,4 +67,4 @@ class DepthEstimator:
         cv2.imwrite(output_path, depth)
         
     def _download_model_from_hf(self, filename: str) -> str:
-        return hf_hub_download( repo_id=self._HF_REPO, filename=filename, token=self._HF_TOKEN)
+        return hf_hub_download(repo_id=self._HF_REPO, filename=filename)
